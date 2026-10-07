@@ -1,0 +1,22 @@
+[project]
+name = "peliculas"
+version = "0.1.0"
+description = "TODO"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "polars>=2.0.0",
+]
+
+[project.scripts]
+peliculas = "peliculas:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.10",
+    "ty>=0.0.85",
+]
