@@ -1,6 +1,9 @@
+from polars.dataframe.frame import P
 from pathlib import Path
+from pprint import pprint
 
 import polars as pl
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder
 
 
@@ -12,20 +15,7 @@ def filters_movies(data: pl.DataFrame) -> pl.DataFrame:
     return data.filter(pl.col("type") == "Movie")
 
 
-def drop_variables(data: pl.DataFrame) -> pl.DataFrame:
-    return data.select(
-        [
-            "title",
-            "release_year",
-            "rating",
-            "duration",
-            "country",
-            "listed_in",
-        ]
-    )
-
-
-def drop_variables2(data: pl.DataFrame, var: list[str]) -> pl.DataFrame:
+def drop_variables(data: pl.DataFrame, var: list[str]) -> pl.DataFrame:
     return data.select(var)
 
 
@@ -120,14 +110,21 @@ def print_final_counts(features: pl.DataFrame) -> None:
     print(f"Final feature rows: {features.height}")
     print(f"Final feature count: {features.width}")
 
+def tfidf_transform(data: pl.DataFrame) -> tuple:
+    texts = data["description"].fill_null("").to_list()
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        min_df=2,
+        max_df=0.25)
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    return vectorizer, tfidf_matrix
 
 def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.DataFrame]:
     print(f"Rows before filtering: {data.height}")
     movies = filters_movies(data)
     print(f"Movie rows: {movies.height}")
 
-    # selected = drop_variables(movies)
-    selected = drop_variables2(
+    selected = drop_variables(
         movies,
         [
             "title",
@@ -155,3 +152,14 @@ def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.Data
 
     print_final_counts(features)
     return titles, features
+
+
+def process_data_description(data: pl.DataFrame) -> pl.DataFrame:
+    data = filters_movies(data)
+    data = drop_variables(data, ["description"])
+    data= fill_nan(data)
+    data = drop_null(data)
+    vectorizer, tfidf_matrix = tfidf_transform(data)
+    pprint(vectorizer)
+    pprint(tfidf_matrix)
+    return data

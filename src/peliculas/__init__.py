@@ -1,11 +1,11 @@
 from pprint import pprint
-from peliculas.etl_characteristics import (
+
+from peliculas import consts
+from peliculas.etl import (
     load_data,
     process_data_characteristics,
-    process_data_characteristics,
+    process_data_description,
 )
-from peliculas import consts
-from peliculas.etl_description import load_data, process_data_description
 
 
 def main() -> None:
