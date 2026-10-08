@@ -1,3 +1,3 @@
 from pathlib import Path
 
-Data_path: Path = Path("data/")
+DATA_PATH: Path = Path("data/")
