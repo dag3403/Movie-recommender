@@ -24,18 +24,12 @@ def drop_variables(data: pl.DataFrame) -> pl.DataFrame:
         ]
     )
 
+def drop_variables2(data: pl.DataFrame, var: list[str]) -> pl.DataFrame:
+    return data.select(var)
+
 
 def drop_null(data: pl.DataFrame) -> pl.DataFrame:
-    return data.drop_nulls(
-        subset=[
-            "title",
-            "release_year",
-            "rating",
-            "duration",
-            "country",
-            "listed_in",
-        ]
-    )
+    return data.drop_nulls()
 
 
 def fill_nan(data: pl.DataFrame) -> pl.DataFrame:
@@ -126,12 +120,20 @@ def print_final_counts(features: pl.DataFrame) -> None:
     print(f"Final feature count: {features.width}")
 
 
-def process_data(data: pl.DataFrame) -> tuple[pl.Series, pl.DataFrame]:
+def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.DataFrame]:
     print(f"Rows before filtering: {data.height}")
     movies = filters_movies(data)
     print(f"Movie rows: {movies.height}")
 
-    selected = drop_variables(movies)
+    #selected = drop_variables(movies)
+    selected = drop_variables2(movies, [
+            "title",
+            "release_year",
+            "rating",
+            "duration",
+            "country",
+            "listed_in",
+        ])
     selected = fill_nan(selected)
     complete = drop_null(selected)
 
