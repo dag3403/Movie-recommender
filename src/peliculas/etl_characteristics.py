@@ -24,6 +24,7 @@ def drop_variables(data: pl.DataFrame) -> pl.DataFrame:
         ]
     )
 
+
 def drop_variables2(data: pl.DataFrame, var: list[str]) -> pl.DataFrame:
     return data.select(var)
 
@@ -125,15 +126,18 @@ def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.Data
     movies = filters_movies(data)
     print(f"Movie rows: {movies.height}")
 
-    #selected = drop_variables(movies)
-    selected = drop_variables2(movies, [
+    # selected = drop_variables(movies)
+    selected = drop_variables2(
+        movies,
+        [
             "title",
             "release_year",
             "rating",
             "duration",
             "country",
             "listed_in",
-        ])
+        ],
+    )
     selected = fill_nan(selected)
     complete = drop_null(selected)
 
