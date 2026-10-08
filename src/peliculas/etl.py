@@ -1,10 +1,18 @@
-from polars.dataframe.frame import P
+import string
 from pathlib import Path
 from pprint import pprint
 
+import matplotlib.pyplot as plt
+import numpy as np
 import polars as pl
+from matplotlib.figure import Figure
+from matplotlib.pylab import plot
+from scipy.sparse import spmatrix
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder
+from sklearn.metrics import pairwise_distances, silhouette_score
+from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder, normalize
 
 
 def load_data(directory: Path) -> pl.DataFrame:
@@ -119,13 +127,10 @@ def tfidf_transform(data: pl.DataFrame) -> tuple:
     tfidf_matrix = vectorizer.fit_transform(texts)
     return vectorizer, tfidf_matrix
 
-def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.DataFrame]:
-    print(f"Rows before filtering: {data.height}")
-    movies = filters_movies(data)
-    print(f"Movie rows: {movies.height}")
 
+def _complete_characteristic_movies(data: pl.DataFrame) -> pl.DataFrame:
     selected = drop_variables(
-        movies,
+        data,
         [
             "title",
             "release_year",
@@ -133,10 +138,22 @@ def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.Data
             "duration",
             "country",
             "listed_in",
+            "description",
         ],
     )
-    selected = fill_nan(selected)
-    complete = drop_null(selected)
+    return drop_null(fill_nan(selected))
+
+
+def _described_movies(data: pl.DataFrame) -> pl.DataFrame:
+    return filters_movies(data).filter(pl.col("description").is_not_null())
+
+
+def process_data_characteristics(data: pl.DataFrame) -> pl.DataFrame:
+    print(f"Rows before filtering: {data.height}")
+    movies = filters_movies(data)
+    print(f"Movie rows: {movies.height}")
+
+    complete = _complete_characteristic_movies(movies)
 
     print(f"Rows removed for null/NaN values: {movies.height - complete.height}")
     print(f"Complete movie rows: {complete.height}")
@@ -151,15 +168,132 @@ def process_data_characteristics(data: pl.DataFrame) -> tuple[pl.Series, pl.Data
     features = join_features(numeric, ratings, countries, genres)
 
     print_final_counts(features)
-    return titles, features
+    
+    return features
 
 
 def process_data_description(data: pl.DataFrame) -> pl.DataFrame:
-    data = filters_movies(data)
+    data = _described_movies(data)
     data = drop_variables(data, ["description"])
-    data= fill_nan(data)
-    data = drop_null(data)
+    data = fill_nan(data)
     vectorizer, tfidf_matrix = tfidf_transform(data)
     pprint(vectorizer)
     pprint(tfidf_matrix)
-    return data
+    return tfidf_matrix
+
+
+def n_optimo_clusters(data: pl.DataFrame) -> None:
+    inercia = []
+    silhouette_scores = []
+    rango_k = range(2, 20)
+
+    for k in rango_k:
+        kmeans = KMeans(n_clusters = k, random_state = 42, n_init = "auto")
+        kmeans.fit(data)
+
+        inercia.append(kmeans.inertia_)
+
+        score = silhouette_score(data, kmeans.labels_)
+        silhouette_scores.append(score)
+
+    
+    plt.figure(figsize=(12, 4))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(rango_k, inercia, marker='o', linestyle='--')
+    plt.title('Método del Codo')
+    plt.xlabel('Número de clústeres (k)')
+    plt.ylabel('Inercia (Suma de errores al cuadrado)')
+    plt.xlim(min(rango_k) - 0.5, max(rango_k) + 0.5)
+    plt.xticks(list(rango_k))
+
+    plt.subplot(1, 2, 2)
+    plt.plot(rango_k, silhouette_scores, marker='s', color='orange', linestyle='--')
+    plt.title('Coeficiente de Silueta')
+    plt.xlabel('Número de clústeres (k)')
+    plt.ylabel('Silhouette Score')
+
+    plt.tight_layout()
+    plt.show()
+
+def kmeans_clustering(data: pl.DataFrame, n_clusters: int, tipo: str) -> pl.DataFrame:
+    if tipo == "char":
+        model = KMeans(
+            n_clusters=n_clusters,
+            random_state=42,
+            n_init="auto"
+        )
+
+    elif tipo == "desc":
+        data = normalize(data)
+        model = KMeans(
+            n_clusters=n_clusters,
+            random_state=42,
+            n_init="auto"
+        )
+    else:
+        raise ValueError("La variables deben ser 'char' o 'desc'.")
+
+    labels = model.fit_predict(data)
+
+    print(labels)
+    return labels
+
+def recomendador(
+    movie: str,
+    n: int,
+    tipo: str,
+    data: pl.DataFrame,
+    features: pl.DataFrame | np.ndarray | spmatrix,
+    labels: np.ndarray,
+) -> pl.DataFrame:
+    if not movie.strip():
+        raise ValueError("El título de la película no puede estar vacío.")
+    if n < 1:
+        raise ValueError("n debe ser un número mayor que 0.")
+    if tipo not in ("char", "desc"):
+        raise ValueError("tipo debe ser 'char' o 'desc'.")
+
+    if tipo == "char":
+        titles = get_titles(
+            _complete_characteristic_movies(filters_movies(data))
+        ).to_list()
+        distance_metric = "euclidean"
+    else:
+        titles = get_titles(_described_movies(data)).to_list()
+        distance_metric = "cosine"
+
+    if len(titles) != features.shape[0] or len(labels) != features.shape[0]:
+        raise ValueError(
+            "Los títulos, las características y las etiquetas deben estar alineados."
+        )
+
+    matching_indices = [
+        index
+        for index, title in enumerate(titles)
+        if title is not None and title.strip().casefold() == movie.strip().casefold()
+    ]
+    if not matching_indices:
+        raise ValueError(f"No se encontró la película '{movie}'.")
+
+    target_index = matching_indices[0]
+    distances = pairwise_distances(
+        features[target_index : target_index + 1],
+        features,
+        metric=distance_metric,
+    )[0]
+
+    candidates = [
+        index
+        for index, label in enumerate(labels)
+        if label == labels[target_index] and index != target_index
+    ]
+    candidates.sort(key=lambda index: distances[index])
+    recommendations = candidates[:n]
+
+    return pl.DataFrame(
+        {
+            "title": [titles[index] for index in recommendations],
+            "distance": [float(distances[index]) for index in recommendations],
+        }
+    )
