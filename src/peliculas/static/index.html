@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101522">
+    <title>Framewise · Netflix Insights</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#inicio" aria-label="Framewise, inicio">
+          <span class="brand-mark">F</span>
+          <span><strong>framewise</strong><small>NETFLIX INSIGHTS</small></span>
+        </a>
+        <div class="sidebar-label">ESPACIO DE TRABAJO</div>
+        <nav class="main-nav" aria-label="Navegación principal">
+          <button class="nav-link active" data-section="inicio"><span>◈</span> Resumen</button>
+          <button class="nav-link" data-section="clusters"><span>◌</span> Exploración de clusters</button>
+          <button class="nav-link" data-section="recommender"><span>✳</span> Recomendador</button>
+          <button class="nav-link" data-section="catalog"><span>▤</span> Catálogo</button>
+        </nav>
+        <div class="sidebar-foot">
+          <span class="status-dot"></span>
+          <span>Datos del proyecto</span>
+          <small>Netflix titles · local</small>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div><span class="eyebrow">MOVIE INTELLIGENCE</span><span class="topbar-divider">/</span><span id="breadcrumb">Resumen</span></div>
+          <span class="live-pill"><span class="status-dot"></span> Pipeline conectado</span>
+        </header>
+
+        <section class="page-section active" id="section-inicio">
+          <div class="hero">
+            <div class="hero-copy">
+              <span class="eyebrow">DESCUBRE EL CATÁLOGO</span>
+              <h1>Encuentra historias<br>que conectan.</h1>
+              <p>Explora los patrones del catálogo de Netflix y descubre películas relacionadas a partir de sus características y descripciones reales.</p>
+              <button class="button button-primary" data-go="clusters">Explorar clusters <span>→</span></button>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+              <div class="orbit-core">F</div>
+              <span class="orbit-node node-one"></span><span class="orbit-node node-two"></span>
+              <span class="orbit-node node-three"></span><span class="orbit-node node-four"></span>
+              <span class="art-caption">DATOS · PATRONES · DESCUBRIMIENTO</span>
+            </div>
+          </div>
+          <div class="section-heading">
+            <div><span class="eyebrow">EL PROYECTO EN NÚMEROS</span><h2>Una vista del catálogo</h2></div>
+            <span class="subtle">Resultados calculados desde los datos locales</span>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card"><span class="metric-icon purple">▤</span><span class="metric-label">Títulos en catálogo</span><strong id="metric-catalog">—</strong><span class="metric-note">Películas y series</span></article>
+            <article class="metric-card"><span class="metric-icon teal">▣</span><span class="metric-label">Películas</span><strong id="metric-movies">—</strong><span class="metric-note">Disponibles para explorar</span></article>
+            <article class="metric-card"><span class="metric-icon amber">◉</span><span class="metric-label">Clusters · características</span><strong id="metric-char-clusters">—</strong><span class="metric-note" id="metric-char-total">Películas agrupadas</span></article>
+            <article class="metric-card"><span class="metric-icon rose">✳</span><span class="metric-label">Clusters · descripción</span><strong id="metric-desc-clusters">—</strong><span class="metric-note" id="metric-desc-total">Películas agrupadas</span></article>
+          </div>
+          <div class="quick-grid">
+            <button class="quick-card" data-go="clusters"><span class="quick-symbol">◌</span><span><strong>Explora los grupos</strong><small>Compara las dos formas de agrupar películas.</small></span><span class="quick-arrow">↗</span></button>
+            <button class="quick-card" data-go="recommender"><span class="quick-symbol">✳</span><span><strong>Encuentra tu próxima película</strong><small>Recibe recomendaciones del modelo actual.</small></span><span class="quick-arrow">↗</span></button>
+            <button class="quick-card" data-go="catalog"><span class="quick-symbol">▤</span><span><strong>Recorre el catálogo</strong><small>Busca entre todos los títulos disponibles.</small></span><span class="quick-arrow">↗</span></button>
+          </div>
+        </section>
+
+        <section class="page-section" id="section-clusters">
+          <div class="page-title">
+            <div><span class="eyebrow">APRENDIZAJE NO SUPERVISADO</span><h1>Exploración de clusters</h1><p>Compara cómo se agrupan las películas usando atributos estructurados o el texto de sus descripciones.</p></div>
+            <label class="field compact-field">Enfoque
+              <select id="cluster-approach"><option value="characteristics">Characteristics</option><option value="description">Description</option></select>
+            </label>
+          </div>
+          <div class="cluster-summary-grid">
+            <article class="panel cluster-intro"><div class="panel-kicker">ENFOQUE ACTIVO</div><h2 id="cluster-approach-title">Características</h2><p id="cluster-approach-description">Año, duración, clasificación, país y géneros codificados.</p><div class="cluster-total"><strong id="cluster-count">—</strong><span>clusters</span><i></i><strong id="cluster-movies">—</strong><span>películas agrupadas</span></div></article>
+            <article class="panel chart-panel"><div class="panel-header"><div><span class="eyebrow">DISTRIBUCIÓN</span><h2>Tamaño de los grupos</h2></div><span class="subtle">Selecciona un cluster</span></div><div id="cluster-bars" class="cluster-bars" aria-label="Distribución de películas entre clusters"></div></article>
+          </div>
+          <article class="panel members-panel">
+            <div class="panel-header members-header"><div><span class="eyebrow">PELÍCULAS DEL GRUPO</span><h2 id="selected-cluster-title">Selecciona un cluster</h2><span id="selected-cluster-caption" class="subtle"></span></div><label class="search-field small-search"><span>⌕</span><input id="cluster-search" type="search" placeholder="Buscar en este cluster" autocomplete="off"></label></div>
+            <div id="cluster-members" class="movie-grid compact-movie-grid"><div class="empty-state">Elige un grupo para ver sus películas.</div></div>
+            <div id="cluster-pagination" class="pagination"></div>
+          </article>
+        </section>
+
+        <section class="page-section" id="section-recommender">
+          <div class="page-title"><div><span class="eyebrow">DESCUBRIMIENTO PERSONALIZADO</span><h1>Recomendador de películas</h1><p>Elige una película del catálogo y encuentra títulos cercanos dentro de su cluster.</p></div></div>
+          <div class="recommend-layout">
+            <form id="recommend-form" class="panel recommend-form">
+              <div class="panel-kicker">CONFIGURA TU BÚSQUEDA</div>
+              <label class="field reference-field">Película de referencia
+                <span class="input-wrap"><input id="reference-search" type="search" placeholder="Escribe un título..." autocomplete="off"><span class="input-icon">⌕</span></span>
+                <span id="reference-suggestions" class="suggestions" role="listbox"></span>
+              </label>
+              <div id="selected-reference" class="selected-reference hidden"></div>
+              <div class="form-row">
+                <label class="field">Número de recomendaciones<input id="recommend-count" type="number" min="1" max="100" value="8" required></label>
+                <label class="field">Tipo de recomendación<select id="recommend-approach"><option value="characteristics">Characteristics</option><option value="description">Description</option></select></label>
+              </div>
+              <button class="button button-primary full-button" type="submit">Obtener recomendaciones <span>→</span></button>
+              <div id="recommend-error" class="inline-message error-message hidden" role="alert"></div>
+              <p class="form-footnote">Las recomendaciones se ordenan por distancia creciente dentro del cluster de la película elegida.</p>
+            </form>
+            <div class="recommend-results">
+              <div class="results-heading"><div><span class="eyebrow">RESULTADOS DEL MODELO</span><h2 id="recommend-results-title">Tu selección aparecerá aquí</h2></div><span id="recommend-result-count" class="result-count hidden"></span></div>
+              <div id="recommendations" class="recommendation-list"><div class="empty-panel"><span>✳</span><strong>Una buena historia lleva a otra.</strong><small>Selecciona una película para ver sugerencias basadas en sus características o descripción.</small></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page-section" id="section-catalog">
+          <div class="page-title"><div><span class="eyebrow">EXPLORADOR DE DATOS</span><h1>Catálogo de películas</h1><p>Busca, ordena y selecciona cualquier título para usarlo como referencia en el recomendador.</p></div></div>
+          <article class="panel catalog-panel">
+            <div class="catalog-toolbar">
+              <label class="search-field catalog-search"><span>⌕</span><input id="catalog-search" type="search" placeholder="Busca por título..." autocomplete="off"></label>
+              <div class="sort-controls"><label class="field inline-field">Ordenar por<select id="catalog-sort"><option value="title">Título</option><option value="year">Año</option></select></label><button id="sort-direction" class="sort-direction" type="button" aria-label="Cambiar dirección de orden">↑ A–Z</button></div>
+            </div>
+            <div class="catalog-count-line"><span id="catalog-count">Cargando catálogo…</span><span id="catalog-page-label" class="subtle"></span></div>
+            <div class="table-scroll"><table><thead><tr><th>TÍTULO</th><th>AÑO</th><th>DURACIÓN</th><th>CLASIFICACIÓN</th><th>PAÍS</th><th>GÉNEROS</th><th></th></tr></thead><tbody id="catalog-rows"></tbody></table></div>
+            <div id="catalog-empty" class="empty-state hidden">No se encontraron títulos para esta búsqueda.</div>
+            <div id="catalog-pagination" class="pagination"></div>
+          </article>
+        </section>
+
+        <footer class="app-footer"><span>FRAMEWISE <span class="footer-dot">·</span> ANÁLISIS LOCAL</span><span>Clustering y recomendaciones calculados desde el pipeline del proyecto</span></footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

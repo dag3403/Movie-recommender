@@ -122,7 +122,7 @@ def tfidf_transform(data: pl.DataFrame) -> tuple:
     texts = data["description"].fill_null("").to_list()
     vectorizer = TfidfVectorizer(
         stop_words="english",
-        min_df=2,
+        min_df=6,
         max_df=0.25)
     tfidf_matrix = vectorizer.fit_transform(texts)
     return vectorizer, tfidf_matrix
@@ -132,6 +132,7 @@ def _complete_characteristic_movies(data: pl.DataFrame) -> pl.DataFrame:
     selected = drop_variables(
         data,
         [
+            "show_id",
             "title",
             "release_year",
             "rating",
@@ -246,6 +247,8 @@ def recomendador(
     data: pl.DataFrame,
     features: pl.DataFrame | np.ndarray | spmatrix,
     labels: np.ndarray,
+    reference_show_id: str | None = None,
+    include_show_ids: bool = False,
 ) -> pl.DataFrame:
     if not movie.strip():
         raise ValueError("El título de la película no puede estar vacío.")
@@ -255,24 +258,33 @@ def recomendador(
         raise ValueError("tipo debe ser 'char' o 'desc'.")
 
     if tipo == "char":
-        titles = get_titles(
-            _complete_characteristic_movies(filters_movies(data))
-        ).to_list()
+        aligned_movies = _complete_characteristic_movies(filters_movies(data))
         distance_metric = "euclidean"
     else:
-        titles = get_titles(_described_movies(data)).to_list()
+        aligned_movies = _described_movies(data)
         distance_metric = "cosine"
 
+    titles = get_titles(aligned_movies).to_list()
     if len(titles) != features.shape[0] or len(labels) != features.shape[0]:
         raise ValueError(
             "Los títulos, las características y las etiquetas deben estar alineados."
         )
 
-    matching_indices = [
-        index
-        for index, title in enumerate(titles)
-        if title is not None and title.strip().casefold() == movie.strip().casefold()
-    ]
+    if reference_show_id is not None:
+        show_ids = aligned_movies.get_column("show_id").to_list()
+        matching_indices = [
+            index
+            for index, show_id in enumerate(show_ids)
+            if show_id == reference_show_id
+        ]
+    else:
+        show_ids = []
+        matching_indices = [
+            index
+            for index, title in enumerate(titles)
+            if title is not None
+            and title.strip().casefold() == movie.strip().casefold()
+        ]
     if not matching_indices:
         raise ValueError(f"No se encontró la película '{movie}'.")
 
@@ -291,9 +303,13 @@ def recomendador(
     candidates.sort(key=lambda index: distances[index])
     recommendations = candidates[:n]
 
-    return pl.DataFrame(
-        {
-            "title": [titles[index] for index in recommendations],
-            "distance": [float(distances[index]) for index in recommendations],
-        }
-    )
+    result = {
+        "title": [titles[index] for index in recommendations],
+        "distance": [float(distances[index]) for index in recommendations],
+    }
+    if include_show_ids:
+        if reference_show_id is None:
+            show_ids = aligned_movies.get_column("show_id").to_list()
+        result["show_id"] = [show_ids[index] for index in recommendations]
+
+    return pl.DataFrame(result)
