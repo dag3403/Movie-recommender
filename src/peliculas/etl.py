@@ -122,8 +122,19 @@ def tfidf_transform(
     ngram_range: tuple[int, int] = (1, 2),
     sublinear_tf: bool = True,
     top_terms_per_document: int | None = 15,
+    include_title: bool = True,
 ) -> tuple[TfidfVectorizer, csr_matrix]:
-    texts = data["description"].fill_null("").to_list()
+    descriptions = data.get_column("description").fill_null("").to_list()
+    if include_title:
+        if "title" not in data.columns:
+            raise ValueError("Se requiere la columna 'title' para incluir títulos en TF-IDF.")
+        titles = data.get_column("title").fill_null("").to_list()
+        texts = [
+            f"{title} {description}"
+            for title, description in zip(titles, descriptions, strict=True)
+        ]
+    else:
+        texts = descriptions
     vectorizer = TfidfVectorizer(
         stop_words="english",
         min_df=min_df,
@@ -193,10 +204,8 @@ def process_data_characteristics(data: pl.DataFrame) -> pl.DataFrame:
 
 
 def process_data_description(data: pl.DataFrame) -> pl.DataFrame:
-    data = _described_movies(data)
-    data = drop_variables(data, ["description"])
-    data = fill_nan(data)
-    vectorizer, tfidf_matrix = tfidf_transform(data)
+    movies = _described_movies(data)
+    vectorizer, tfidf_matrix = tfidf_transform(movies)
     pprint(vectorizer)
     pprint(tfidf_matrix)
     return tfidf_matrix
@@ -265,7 +274,6 @@ def recomendador(
     tipo: str,
     data: pl.DataFrame,
     features: pl.DataFrame | np.ndarray | spmatrix,
-    labels: np.ndarray,
     reference_show_id: str | None = None,
     include_show_ids: bool = False,
 ) -> pl.DataFrame:
@@ -284,9 +292,9 @@ def recomendador(
         distance_metric = "cosine"
 
     titles = get_titles(aligned_movies).to_list()
-    if len(titles) != features.shape[0] or len(labels) != features.shape[0]:
+    if len(titles) != features.shape[0]:
         raise ValueError(
-            "Los títulos, las características y las etiquetas deben estar alineados."
+            "Los títulos y las características deben estar alineados."
         )
 
     if reference_show_id is not None:
@@ -314,11 +322,7 @@ def recomendador(
         metric=distance_metric,
     )[0]
 
-    candidates = [
-        index
-        for index, label in enumerate(labels)
-        if label == labels[target_index] and index != target_index
-    ]
+    candidates = [index for index in range(len(titles)) if index != target_index]
     candidates.sort(key=lambda index: distances[index])
     recommendations = candidates[:n]
 

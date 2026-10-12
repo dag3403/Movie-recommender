@@ -27,7 +27,8 @@ La aplicación ofrece una interfaz web local con cuatro vistas:
 - **Clusters:** distribución y listado paginado de películas agrupadas por
   características o descripción.
 - **Recomendador:** elige una película, un enfoque y cuántas recomendaciones quieres.
-  Las sugerencias se restringen al cluster de la película y se ordenan por distancia.
+  Las sugerencias se buscan en todas las películas elegibles del enfoque seleccionado,
+  sin restringirse al cluster, y se ordenan por distancia a la película de referencia.
 - **Catálogo:** búsqueda parcial sin distinguir mayúsculas, ordenación y paginación.
   Las películas se pueden seleccionar para iniciar una recomendación.
 
@@ -46,30 +47,38 @@ películas, pero no necesariamente la misma cantidad:
 Usa año de lanzamiento, duración, clasificación, países y géneros. Las variables
 numéricas se escalan y las categóricas se codifican. Se eliminan los registros que no
 tienen completos los campos requeridos. La aplicación ejecuta KMeans con **2 clusters**
-y recomienda dentro del mismo cluster usando distancia euclídea.
+y para explorar la distribución de grupos. Las recomendaciones comparan todas las
+películas elegibles usando distancia euclídea, independientemente de su cluster.
 
 ### `desc`: descripciones de texto
 
-Se usan las películas con descripción. El pipeline TF-IDF de
+Se usan las películas con descripción y se concatena el título con el texto descriptivo
+antes de construir un único vector TF-IDF por película. De ese modo, los términos del
+título pueden contribuir a los clusters y a las recomendaciones con el mismo
+preprocesamiento que los términos de la descripción. El pipeline TF-IDF de
 `src/peliculas/etl.py` aplica:
 
 - `min_df=3` y `max_df=0.85` para filtrar términos por frecuencia documental.
 - Unigramas y bigramas (`ngram_range=(1, 2)`).
 - Frecuencia sublineal (`sublinear_tf=True`).
-- Un máximo de **15 términos con mayor peso TF-IDF en cada descripción**.
+- Un máximo de **15 términos con mayor peso TF-IDF por texto combinado**.
 - Normalización de cada vector después de seleccionar los términos.
 
 La matriz TF-IDF es dispersa. La aplicación la agrupa con KMeans en **15 clusters** y
 usa distancia coseno para ordenar recomendaciones. La matriz y las etiquetas conservan
 el orden del mismo conjunto de películas para evitar desalinear títulos y resultados.
+Los clusters se usan para explorar y resumir el catálogo; no restringen las candidatas
+del recomendador, que busca por distancia coseno en todas las películas con descripción.
 
 ## Resultados y conclusiones
 
 Los resultados numéricos siguientes proceden del análisis de
 [`notebooks/plots.ipynb`](notebooks/plots.ipynb), con una muestra fija de 1.200
-películas por enfoque para las comparaciones de silueta. Las métricas se calculan en
-representaciones distintas, así que las puntuaciones de `char` y `desc` **no se deben
-comparar directamente**.
+películas por enfoque para las comparaciones de silueta. En `desc`, el baseline
+histórico usa solo la descripción, mientras que la variante TF-IDF enfocada combina
+título y descripción. Además, algunas siluetas se calculan en espacios distintos, así
+que las puntuaciones de `char` y `desc` **no se deben comparar directamente**, ni se
+deben comparar siluetas de espacios diferentes como si fueran equivalentes.
 
 ### Características (`char`)
 
@@ -84,15 +93,20 @@ comparar directamente**.
 
 ### Descripciones (`desc`)
 
-- El TF-IDF de referencia con KMeans obtiene una silueta aproximada de **0,011**.
-- En el notebook se compara con NMF de 15 temas seguido de KMeans. Con el TF-IDF
-  enfocado, la silueta es **0,604 en el espacio de temas**. Al evaluar esas etiquetas
-  en el TF-IDF original, la silueta es **0,006**, por debajo de la referencia. La
-  mejora observada es propia del espacio latente y no demuestra que las películas sean
-  más similares en el espacio léxico original.
-- Los clusters del experimento NMF contienen entre **160** y **1.723** películas. La
-  partición sigue siendo desigual y la calidad semántica requiere revisar ejemplos y
-  términos representativos.
+- El baseline TF-IDF + KMeans (solo descripción) obtiene una silueta aproximada de
+  **0,0071**; el **46,0 %** de las películas de la muestra tiene silueta negativa.
+- La variante enfocada combina título y descripción, limita cada texto combinado a sus
+  **15 términos TF-IDF de mayor peso** y genera un vocabulario de **7.979 términos**.
+- TF-IDF enfocado + NMF de 15 temas + KMeans obtiene una silueta de **0,5371** en el
+  espacio de temas. Al evaluar sus etiquetas en el espacio TF-IDF de referencia, la
+  silueta es **0,0056** y el porcentaje de siluetas negativas **37,5 %**, frente a
+  **0,0071** y **46,0 %** del baseline. La silueta NMF en su propio espacio no es
+  comparable directamente con la del baseline; los resultados no demuestran por sí
+  solos una mayor similitud textual general.
+- Los clusters del experimento NMF contienen entre **231** y **921** películas, frente
+  a **129** y **2.466** en el baseline. La distribución mejora, aunque sigue siendo
+  desigual y la calidad semántica requiere revisar ejemplos y términos
+  representativos. NMF converge en **130 iteraciones** en esta ejecución.
 - **NMF es una comparación experimental del notebook, no el algoritmo de producción
   de la aplicación.** La aplicación usa TF-IDF enfocado y KMeans estándar.
 

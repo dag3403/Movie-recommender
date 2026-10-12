@@ -221,7 +221,7 @@ async function loadRecommendations(event) {
           <span class="distance-pill">Distancia ${Number(movie.distance).toFixed(3)}</span>
         </article>
       `).join("")
-      : '<div class="empty-panel"><strong>No hay recomendaciones disponibles</strong><small>Este cluster no tiene otras películas para sugerir.</small></div>';
+      : '<div class="empty-panel"><strong>No hay recomendaciones disponibles</strong><small>No hay otras películas elegibles para este enfoque.</small></div>';
     if (result.message) showToast(result.message);
   } catch (error) {
     $("#recommend-error").textContent = error.message;

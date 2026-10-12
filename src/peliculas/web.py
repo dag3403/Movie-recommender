@@ -12,8 +12,6 @@ from io import StringIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import numpy as np
-
 from peliculas import consts, etl
 
 LOGGER = logging.getLogger(__name__)
@@ -241,10 +239,9 @@ class MovieExplorer:
                 f"'{reference.get('title')}' no tiene datos completos para el enfoque de {label.lower()}."
             )
 
-        labels = self.labels[approach]
-        target_cluster = int(labels[target_index])
-        available = int(np.count_nonzero(labels == target_cluster)) - 1
-        count = min(requested, max(available, 0))
+        aligned_movies = self.aligned_movies[approach]
+        available = max(aligned_movies.height - 1, 0)
+        count = min(requested, available)
         if count == 0:
             return {
                 "reference": self._movie_summary(reference),
@@ -252,7 +249,7 @@ class MovieExplorer:
                 "requested": requested,
                 "available": 0,
                 "recommendations": [],
-                "message": "No hay recomendaciones disponibles en el cluster de esta película.",
+                "message": "No hay otras películas disponibles para este enfoque.",
             }
 
         key = (approach, show_id)
@@ -260,7 +257,7 @@ class MovieExplorer:
             ranked = self.recommendation_cache.get(key)
             if ranked is None:
                 title = str(reference.get("title") or "")
-                all_in_cluster = etl.recomendador(
+                all_recommendations = etl.recomendador(
                     title,
                     available,
                     APPROACHES[approach][0],
@@ -268,7 +265,6 @@ class MovieExplorer:
                     self.characteristics
                     if approach == "characteristics"
                     else self.descriptions,
-                    labels,
                     reference_show_id=show_id,
                     include_show_ids=True,
                 )
@@ -277,7 +273,7 @@ class MovieExplorer:
                         **self._movie_summary(self.movies_by_id[str(row["show_id"])]),
                         "distance": float(row["distance"]),
                     }
-                    for row in all_in_cluster.to_dicts()
+                    for row in all_recommendations.to_dicts()
                 ]
                 self.recommendation_cache[key] = ranked
                 self.recommendation_cache.move_to_end(key)
@@ -293,8 +289,8 @@ class MovieExplorer:
             "available": available,
             "recommendations": ranked[:count],
             "message": (
-                f"Se muestran {count} de {requested}; el cluster ofrece "
-                f"{available} recomendaciones."
+                f"Se muestran {count} de {requested}; hay "
+                f"{available} películas disponibles para este enfoque."
                 if count < requested
                 else None
             ),

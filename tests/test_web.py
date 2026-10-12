@@ -1,4 +1,10 @@
 import unittest
+from collections import OrderedDict
+from threading import Lock
+from unittest.mock import patch
+
+import numpy as np
+import polars as pl
 
 from peliculas.web import MovieExplorer, _nonnegative_int, _positive_int
 
@@ -69,6 +75,56 @@ class MovieExplorerHelpersTests(unittest.TestCase):
         self.assertEqual(_positive_int("3", "page"), 3)
         with self.assertRaises(ValueError):
             _positive_int("0", "page")
+
+
+class MovieExplorerRecommendationTests(unittest.TestCase):
+    def test_recommendation_availability_ignores_cluster_membership(self) -> None:
+        explorer = MovieExplorer.__new__(MovieExplorer)
+        explorer.movies_by_id = {
+            show_id: {
+                "show_id": show_id,
+                "type": "Movie",
+                "title": title,
+            }
+            for show_id, title in (
+                ("m1", "Reference"),
+                ("m2", "Same cluster"),
+                ("m3", "Different cluster"),
+            )
+        }
+        explorer.aligned_indices = {
+            "characteristics": {"m1": 0, "m2": 1, "m3": 2}
+        }
+        explorer.aligned_movies = {
+            "characteristics": pl.DataFrame({"show_id": ["m1", "m2", "m3"]})
+        }
+        explorer.labels = {"characteristics": np.array([0, 0, 1])}
+        explorer.recommendation_cache = OrderedDict()
+        explorer.cache_lock = Lock()
+        explorer.catalog = pl.DataFrame()
+        explorer.characteristics = np.zeros((3, 2))
+
+        recommendation_rows = pl.DataFrame(
+            {
+                "show_id": ["m2", "m3"],
+                "title": ["Same cluster", "Different cluster"],
+                "distance": [0.1, 0.2],
+            }
+        )
+        with patch(
+            "peliculas.web.etl.recomendador",
+            return_value=recommendation_rows,
+        ) as recommender:
+            result = explorer.recommend("m1", "characteristics", 5)
+
+        self.assertEqual(result["available"], 2)
+        self.assertEqual(
+            [row["show_id"] for row in result["recommendations"]],
+            ["m2", "m3"],
+        )
+        recommender.assert_called_once()
+        self.assertEqual(recommender.call_args.args[1], 2)
+        self.assertIn("2 películas disponibles", result["message"])
 
 
 if __name__ == "__main__":
