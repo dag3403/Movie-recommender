@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from matplotlib.figure import Figure
 from matplotlib.pylab import plot
-from scipy.sparse import spmatrix
+from scipy.sparse import csr_matrix, spmatrix
 from sklearn.cluster import KMeans
 from sklearn.datasets import make_blobs
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -118,13 +118,37 @@ def print_final_counts(features: pl.DataFrame) -> None:
     print(f"Final feature rows: {features.height}")
     print(f"Final feature count: {features.width}")
 
-def tfidf_transform(data: pl.DataFrame) -> tuple:
+def tfidf_transform(
+    data: pl.DataFrame,
+    *,
+    min_df: float = 3,
+    max_df: float = 0.85,
+    ngram_range: tuple[int, int] = (1, 2),
+    sublinear_tf: bool = True,
+    top_terms_per_document: int | None = 15,
+) -> tuple[TfidfVectorizer, csr_matrix]:
     texts = data["description"].fill_null("").to_list()
     vectorizer = TfidfVectorizer(
         stop_words="english",
-        min_df=6,
-        max_df=0.25)
-    tfidf_matrix = vectorizer.fit_transform(texts)
+        min_df=min_df,
+        max_df=max_df,
+        ngram_range=ngram_range,
+        sublinear_tf=sublinear_tf,
+    )
+    tfidf_matrix = vectorizer.fit_transform(texts).tocsr()
+    if top_terms_per_document is not None:
+        if top_terms_per_document < 1:
+            raise ValueError("top_terms_per_document debe ser mayor que 0 o None.")
+        for row in range(tfidf_matrix.shape[0]):
+            start, end = tfidf_matrix.indptr[row : row + 2]
+            row_weights = tfidf_matrix.data[start:end]
+            if len(row_weights) > top_terms_per_document:
+                discarded = np.argpartition(
+                    row_weights, -top_terms_per_document
+                )[:-top_terms_per_document]
+                tfidf_matrix.data[start + discarded] = 0
+        tfidf_matrix.eliminate_zeros()
+        tfidf_matrix = normalize(tfidf_matrix).tocsr()
     return vectorizer, tfidf_matrix
 
 

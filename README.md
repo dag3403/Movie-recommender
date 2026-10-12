@@ -31,3 +31,9 @@ Los clusters usan los parámetros que ya emplea `peliculas.main`: 2 para caracte
 y 15 para descripciones. El clustering de características solo contiene registros con
 los campos requeridos completos; el enfoque de descripción contiene películas con
 descripción. La aplicación no guarda ni sobrescribe los datos originales.
+
+El pipeline de descripción aplica TF-IDF con `min_df=3`, `max_df=0.85`, unigramas y
+bigramas, y frecuencia sublineal. Después conserva como máximo los 15 términos con
+mayor peso TF-IDF de cada descripción y vuelve a normalizar sus vectores. La misma
+matriz se utiliza para entrenar los clusters y calcular las recomendaciones, para
+mantener las películas y etiquetas alineadas.
