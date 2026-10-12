@@ -1,5 +1,3 @@
-from pprint import pprint
-
 from peliculas import consts
 from peliculas.etl import (
     kmeans_clustering,
@@ -9,6 +7,15 @@ from peliculas.etl import (
     process_data_description,
     recomendador,
 )
+
+__all__ = [
+    "kmeans_clustering",
+    "load_data",
+    "n_optimo_clusters",
+    "process_data_characteristics",
+    "process_data_description",
+    "recomendador",
+]
 
 
 def main() -> None:

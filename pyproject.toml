@@ -1,7 +1,7 @@
 [project]
 name = "peliculas"
 version = "0.1.0"
-description = "TODO"
+description = "Explorador de catálogo de películas con clustering y recomendaciones"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

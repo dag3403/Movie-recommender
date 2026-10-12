@@ -1,15 +1,11 @@
-import string
 from pathlib import Path
 from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
-from matplotlib.figure import Figure
-from matplotlib.pylab import plot
 from scipy.sparse import csr_matrix, spmatrix
 from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import pairwise_distances, silhouette_score
 from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder, normalize
@@ -183,7 +179,6 @@ def process_data_characteristics(data: pl.DataFrame) -> pl.DataFrame:
     print(f"Rows removed for null/NaN values: {movies.height - complete.height}")
     print(f"Complete movie rows: {complete.height}")
 
-    titles = get_titles(complete)
     numeric = create_numeric_features(complete)
     numeric = scale_numeric_features(numeric)
 
