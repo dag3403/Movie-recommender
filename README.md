@@ -1,250 +1,246 @@
 # Netflix Movie Insights
 
-Aplicación local para explorar un catálogo de Netflix, consultar su distribución en
-clusters y obtener recomendaciones de películas similares. Incluye un análisis
-reproducible de la calidad de los clusters y comparaciones entre varias representaciones
-de los datos.
+An interactive application for exploring a Netflix movie catalog, analyzing cluster distributions, and discovering similar movies through content-based recommendations. The project also includes reproducible experiments to evaluate clustering quality and compare different data representations.
 
-## Contenido
+![Netflix Movie Insights — Application Overview](docs/images/movie-explorer.png)
 
-- [Qué hace](#qué-hace)
-- [Datos y representaciones](#datos-y-representaciones)
-- [Resultados y conclusiones](#resultados-y-conclusiones)
-- [Requisitos e instalación](#requisitos-e-instalación)
-- [Ejecutar la aplicación web](#ejecutar-la-aplicación-web)
-- [Ejecutar la aplicación de terminal](#ejecutar-la-aplicación-de-terminal)
-- [Reproducir el análisis](#reproducir-el-análisis)
-- [Pruebas y comprobaciones](#pruebas-y-comprobaciones)
-- [Estructura del proyecto](#estructura-del-proyecto)
-- [Publicar en GitHub](#publicar-en-github)
-- [Licencia y uso de los datos](#licencia-y-uso-de-los-datos)
+## Table of Contents
 
-## Qué hace
+- [Features](#features)
+- [Data and Representations](#data-and-representations)
+- [Results and Findings](#results-and-findings)
+- [Requirements and Installation](#requirements-and-installation)
+- [Running the Web Application](#running-the-web-application)
+- [Running the Command-Line Application](#running-the-command-line-application)
+- [Reproducing the Analysis](#reproducing-the-analysis)
+- [Tests and Quality Checks](#tests-and-quality-checks)
+- [Project Structure](#project-structure)
+- [Publishing to GitHub](#publishing-to-github)
+- [License and Dataset Usage](#license-and-dataset-usage)
 
-La aplicación ofrece una interfaz web local con cuatro vistas:
+## Features
 
-- **Resumen:** tamaño del catálogo, películas y estadísticas de los clusters.
-- **Clusters:** distribución y listado paginado de películas agrupadas por
-  características o descripción.
-- **Recomendador:** elige una película, un enfoque y cuántas recomendaciones quieres.
-  Las sugerencias se buscan en todas las películas elegibles del enfoque seleccionado,
-  sin restringirse al cluster, y se ordenan por distancia a la película de referencia.
-- **Catálogo:** búsqueda parcial sin distinguir mayúsculas, ordenación y paginación.
-  Las películas se pueden seleccionar para iniciar una recomendación.
+The application provides a local web interface with four views:
 
-El catálogo se procesa y los clusters se calculan al iniciar la aplicación. Las
-interacciones reutilizan esos resultados; las recomendaciones se almacenan en una
-caché en memoria durante esa ejecución. La aplicación no sobrescribe el CSV ni guarda
-datos del usuario.
+- **Overview:** displays catalog statistics, the number of movies, and cluster counts for each representation.
+- **Clusters:** explores cluster distributions and paginated movie listings based on structured features or textual descriptions.
+- **Recommendation System:** select a movie, choose a representation, and specify the number of recommendations. Suggestions are retrieved from all eligible movies in the selected representation, regardless of cluster membership, and ranked by distance from the reference movie.
+- **Movie Catalog:** search titles using case-insensitive partial matching, sort results, and browse the catalog with pagination. Movies can be selected to start a recommendation request.
 
-## Datos y representaciones
+The catalog is processed and the clusters are calculated when the application starts. These results are reused during the session, while recommendations are cached in memory. The application does not overwrite the source CSV or store user data.
 
-El catálogo de entrada está en `data/netflix_titles.csv`. Los dos enfoques solo usan
-películas, pero no necesariamente la misma cantidad:
+## Data and Representations
 
-### `char`: características estructuradas
+The input catalog is stored in `data/netflix_titles.csv`. Both approaches use movie records only, but they may include different numbers of movies because each representation has its own data requirements.
 
-Usa año de lanzamiento, duración, clasificación, países y géneros. Las variables
-numéricas se escalan y las categóricas se codifican. Se eliminan los registros que no
-tienen completos los campos requeridos. La aplicación ejecuta KMeans con **2 clusters**
-y para explorar la distribución de grupos. Las recomendaciones comparan todas las
-películas elegibles usando distancia euclídea, independientemente de su cluster.
+### `char`: Structured Features
 
-### `desc`: descripciones de texto
+This representation uses release year, duration, rating, country, and genres.
 
-Se usan las películas con descripción y se concatena el título con el texto descriptivo
-antes de construir un único vector TF-IDF por película. De ese modo, los términos del
-título pueden contribuir a los clusters y a las recomendaciones con el mismo
-preprocesamiento que los términos de la descripción. El pipeline TF-IDF de
-`src/peliculas/etl.py` aplica:
+Numerical variables are scaled, and categorical variables are encoded. Records with missing values in the required fields are removed.
 
-- `min_df=3` y `max_df=0.85` para filtrar términos por frecuencia documental.
-- Unigramas y bigramas (`ngram_range=(1, 2)`).
-- Frecuencia sublineal (`sublinear_tf=True`).
-- Un máximo de **15 términos con mayor peso TF-IDF por texto combinado**.
-- Normalización de cada vector después de seleccionar los términos.
+The application uses KMeans with **2 clusters** to explore the distribution of movies based on structured metadata.
 
-La matriz TF-IDF es dispersa. La aplicación la agrupa con KMeans en **15 clusters** y
-usa distancia coseno para ordenar recomendaciones. La matriz y las etiquetas conservan
-el orden del mismo conjunto de películas para evitar desalinear títulos y resultados.
-Los clusters se usan para explorar y resumir el catálogo; no restringen las candidatas
-del recomendador, que busca por distancia coseno en todas las películas con descripción.
+Recommendations use Euclidean distance across all eligible movies, independently of their cluster assignments.
 
-## Resultados y conclusiones
+### `desc`: Textual Descriptions
 
-Los resultados numéricos siguientes proceden del análisis de
-[`notebooks/plots.ipynb`](notebooks/plots.ipynb), con una muestra fija de 1.200
-películas por enfoque para las comparaciones de silueta. En `desc`, el baseline
-histórico usa solo la descripción, mientras que la variante TF-IDF enfocada combina
-título y descripción. Además, algunas siluetas se calculan en espacios distintos, así
-que las puntuaciones de `char` y `desc` **no se deben comparar directamente**, ni se
-deben comparar siluetas de espacios diferentes como si fueran equivalentes.
+This representation uses movies with available descriptions. Each movie's title is concatenated with its description before generating a single TF-IDF vector.
 
-### Características (`char`)
+This allows title terms to contribute to clustering and recommendations using the same preprocessing pipeline as the description text.
 
-- El KMeans de referencia obtiene una silueta aproximada de **0,149** en el espacio de
-  características original.
-- El experimento de ponderación por bloques obtiene **0,500** en su representación
-  ponderada y **0,269** al evaluar las etiquetas en el espacio original.
-- La mejora tiene un coste de equilibrio: los clusters contienen **701** y **4.986**
-  películas, frente a **1.859** y **3.828** en la referencia.
-- El experimento de bloques equilibrados y sus etiquetas mejoradas pertenecen al
-  notebook; la aplicación usa el pipeline de características de ETL y KMeans estándar.
+The TF-IDF pipeline in `src/peliculas/etl.py` applies the following configuration:
 
-### Descripciones (`desc`)
+- `min_df=3` and `max_df=0.85` to filter terms based on document frequency.
+- Unigrams and bigrams (`ngram_range=(1, 2)`).
+- Sublinear term frequency (`sublinear_tf=True`).
+- A maximum of **15 highest-weight TF-IDF terms per combined text**.
+- Vector normalization after term selection.
 
-- El baseline TF-IDF + KMeans (solo descripción) obtiene una silueta aproximada de
-  **0,0071**; el **46,0 %** de las películas de la muestra tiene silueta negativa.
-- La variante enfocada combina título y descripción, limita cada texto combinado a sus
-  **15 términos TF-IDF de mayor peso** y genera un vocabulario de **7.979 términos**.
-- TF-IDF enfocado + NMF de 15 temas + KMeans obtiene una silueta de **0,5371** en el
-  espacio de temas. Al evaluar sus etiquetas en el espacio TF-IDF de referencia, la
-  silueta es **0,0056** y el porcentaje de siluetas negativas **37,5 %**, frente a
-  **0,0071** y **46,0 %** del baseline. La silueta NMF en su propio espacio no es
-  comparable directamente con la del baseline; los resultados no demuestran por sí
-  solos una mayor similitud textual general.
-- Los clusters del experimento NMF contienen entre **231** y **921** películas, frente
-  a **129** y **2.466** en el baseline. La distribución mejora, aunque sigue siendo
-  desigual y la calidad semántica requiere revisar ejemplos y términos
-  representativos. NMF converge en **130 iteraciones** en esta ejecución.
-- **NMF es una comparación experimental del notebook, no el algoritmo de producción
-  de la aplicación.** La aplicación usa TF-IDF enfocado y KMeans estándar.
+The resulting TF-IDF matrix is sparse. The application uses KMeans with **15 clusters** and cosine distance to rank recommendations.
 
-En resumen, las métricas internas son útiles para comparar alternativas dentro de
-cada enfoque, pero no bastan para demostrar que las sugerencias son pertinentes para
-una persona. El notebook incluye tamaños de cluster, estabilidad entre semillas y
-pruebas funcionales del recomendador; conviene revisar ejemplos de películas y temas
-antes de interpretar los grupos como categorías semánticas definitivas.
+The feature matrix and cluster labels preserve the ordering of the same movie collection to prevent misalignment between titles and results.
 
-## Requisitos e instalación
+Clusters are used to explore and summarize the catalog. They do not restrict the recommendation candidates: the recommender searches all movies with descriptions and ranks them by cosine distance.
 
-- Python **3.12 o posterior**.
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) para crear el entorno y
-  mantener las dependencias sincronizadas con `uv.lock`.
-- Git para clonar el repositorio.
+## Results and Findings
 
-Clona el repositorio y entra en su directorio raíz:
+The numerical results in this section come from the experiments documented in [`notebooks/plots.ipynb`](notebooks/plots.ipynb).
+
+Silhouette comparisons use a fixed sample of 1,200 movies per representation. For `desc`, the historical baseline uses descriptions only, whereas the focused TF-IDF variant combines titles and descriptions.
+
+Some silhouette scores are calculated in different feature spaces. Therefore, **scores from `char` and `desc` should not be compared directly**, nor should scores calculated in different representations be interpreted as equivalent measures of clustering quality.
+
+### Structured Features (`char`)
+
+- The reference KMeans model achieves an approximate silhouette score of **0.149** in the original feature space.
+- The block-weighting experiment achieves a silhouette score of **0.500** in its weighted representation and **0.269** when evaluating the resulting labels in the original feature space.
+- This improvement comes with a trade-off in cluster balance. The resulting clusters contain **701 and 4,986 movies**, compared with **1,859 and 3,828 movies** in the reference configuration.
+- The balanced-block experiment and its improved labels are part of the notebook experiments. The application itself uses the standard feature-processing pipeline and standard KMeans configuration.
+
+These results illustrate that feature weighting can change cluster separation, but a higher silhouette score in a modified representation does not automatically imply more useful or balanced movie groups.
+
+### Textual Descriptions (`desc`)
+
+- The baseline TF-IDF + KMeans model, using descriptions only, achieves an approximate silhouette score of **0.0071**. In the evaluation sample, **46.0%** of movies have negative silhouette values.
+- The focused TF-IDF variant combines each movie's title and description, retains up to **15 highest-weight TF-IDF terms per combined text**, and produces a vocabulary of **7,979 terms**.
+- Focused TF-IDF + NMF with 15 topics + KMeans achieves a silhouette score of **0.5371** in the topic space. When the resulting labels are evaluated in the reference TF-IDF space, the silhouette score is **0.0056**, with **37.5%** of movies having negative silhouette values, compared with **0.0071** and **46.0%** for the baseline.
+- The NMF silhouette score is calculated in a different representation from the baseline score. It is therefore not directly comparable, and these results alone do not demonstrate better overall textual similarity.
+- The clusters from the NMF experiment contain between **231 and 921 movies**, compared with **129 and 2,466 movies** in the baseline. The distribution is more balanced, although it remains uneven. Semantic quality still requires examining representative movies and terms.
+- NMF converged after **130 iterations** in this experiment.
+- **NMF is an experimental comparison in the notebook, not the algorithm used by the production application.** The application uses focused TF-IDF and standard KMeans for the description-based representation.
+
+### Interpretation and Limitations
+
+Internal clustering metrics are useful for comparing alternatives within the same representation, but they cannot establish whether recommendations are relevant to individual users.
+
+The notebook includes cluster-size analysis, stability comparisons across random seeds, and functional recommendation tests. Reviewing representative movies and their associated terms is also important before interpreting clusters as definitive semantic categories.
+
+The project is an exploratory recommendation system rather than a production-grade recommender trained on user ratings or interaction histories. Its recommendations are based on content similarity, not personalized user preferences.
+
+## Requirements and Installation
+
+The project requires:
+
+- **Python 3.12 or later**.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for environment management and dependency synchronization.
+- Git to clone the repository.
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/dag3403/Movie-recommender.git
 cd Movie-recommender
 ```
 
-Instala las dependencias de la aplicación y las herramientas de desarrollo:
+### 2. Install Dependencies
+
+Install the application dependencies and development tools:
 
 ```bash
 uv sync --locked --group dev
 ```
 
-El comando crea `.venv` si hace falta y utiliza las versiones bloqueadas en `uv.lock`.
-No es necesario activar manualmente el entorno para los comandos `uv run` de esta guía.
+This command creates the `.venv` environment if necessary and synchronizes dependencies using the versions specified in `uv.lock`.
 
-## Ejecutar la aplicación web
+You do not need to activate the environment manually when running the commands in this guide with `uv run`.
 
-Desde la raíz del repositorio:
+## Running the Web Application
+
+From the repository root, run:
 
 ```bash
 uv run --locked peliculas-web
 ```
 
-La aplicación abre <http://127.0.0.1:8000>. La primera carga calcula las características,
-vectoriza las descripciones y ajusta los dos KMeans, por lo que puede tardar. Detén el
-servidor con `Ctrl+C`.
+Open the application in your browser at:
 
-Para elegir otra dirección o puerto:
+<http://127.0.0.1:8000>
+
+The initial startup may take some time because the application processes the catalog, builds the feature representations, and fits both KMeans models.
+
+Stop the server with `Ctrl+C`.
+
+To use a different address or port, run:
 
 ```bash
 uv run --locked peliculas-web --host 127.0.0.1 --port 8001
 ```
 
-La aplicación es un servidor de desarrollo local, no una configuración de despliegue
-para producción.
+The web application runs as a local development server. It is not configured for production deployment.
 
-## Ejecutar la aplicación de terminal
+## Running the Command-Line Application
 
-También está disponible el flujo interactivo:
+The project also provides an interactive command-line workflow:
 
 ```bash
 uv run --locked peliculas
 ```
 
-El programa pide un título, el número de recomendaciones y el enfoque (`char` o
-`desc`). Para recomendar por descripción, la película debe tener una descripción y
-pertenecer al conjunto procesado.
+The program asks for a movie title, the number of recommendations, and the representation to use (`char` or `desc`).
 
-## Reproducir el análisis
+For description-based recommendations, the selected movie must have a description and belong to the processed dataset.
 
-Abre `notebooks/plots.ipynb` en VS Code con la extensión Jupyter o en un entorno
-compatible con notebooks. Selecciona como kernel el intérprete del proyecto:
+## Reproducing the Analysis
+
+Open `notebooks/plots.ipynb` in VS Code with the Jupyter extension or another compatible notebook environment.
+
+Select the project's Python interpreter as the notebook kernel:
 
 ```text
 .venv/bin/python
 ```
 
-Luego elige **Run All / Ejecutar todo**. El notebook busca
-`data/netflix_titles.csv` en `data/` o `../data/` respecto al directorio de trabajo
-y recalcula los resultados; para reproducir las métricas, ejecútalo completo y en orden.
-Incluye:
+Then select **Run All** to execute the notebook from beginning to end.
 
-1. Análisis de calidad y distribuciones de los clusters de referencia.
-2. Pruebas de variantes para los enfoques `char` y `desc`.
-3. Comparación de baseline y mejoras sobre muestras fijas, con métricas calculadas
-   dentro de cada representación.
-4. Diez películas de prueba y cinco recomendaciones por película en cada enfoque,
-   con validaciones para excluir el título consultado y no repetir recomendaciones.
+The notebook searches for `data/netflix_titles.csv` in either `data/` or `../data/`, relative to the working directory, and recalculates the results. To reproduce the documented metrics, run all cells in order.
 
-Las salidas guardadas en el notebook son resultados de ejecuciones anteriores. Para
-actualizarlas después de modificar datos o código, ejecuta todas las celdas y guarda
-el notebook.
+The notebook includes:
 
-## Pruebas y comprobaciones
+1. Analysis of baseline clustering quality and cluster-size distributions.
+2. Experiments with alternative representations for `char` and `desc`.
+3. Baseline comparisons and improvements using fixed samples, with metrics calculated within the corresponding representations.
+4. Recommendation tests using ten reference movies and five recommendations per movie for each representation, including checks to exclude the reference movie and avoid duplicate recommendations.
 
-Ejecuta los tests:
+The outputs saved in the notebook correspond to previous executions. To update them after changing the data or code, execute all cells and save the notebook.
+
+## Tests and Quality Checks
+
+### Run the Unit Tests
 
 ```bash
 uv run --locked --group dev python -m unittest discover -s tests
 ```
 
-Comprueba el estilo de código:
+### Check Code Style
 
 ```bash
 uv run --locked --group dev ruff check src tests
 ```
 
-Construye las distribuciones del paquete:
+### Build the Package
 
 ```bash
 uv build
 ```
 
-Comprueba los argumentos de la aplicación web:
+### Check Web Application Arguments
 
 ```bash
 uv run --locked peliculas-web --help
 ```
 
-## Estructura del proyecto
+These commands provide local checks for the project. The repository does not currently configure a continuous integration workflow.
+
+## Project Structure
 
 ```text
 .
 ├── data/
-│   └── netflix_titles.csv   # catálogo de entrada
+│   └── netflix_titles.csv   # Input movie catalog
+├── docs/
+│   └── images/
+│       └── movie-explorer.png  # Application overview screenshot
 ├── notebooks/
-│   └── plots.ipynb          # análisis, evaluación y recomendaciones de prueba
+│   └── plots.ipynb          # Analysis, evaluation, and recommendation experiments
 ├── src/peliculas/
-│   ├── etl.py               # preparación, TF-IDF, clustering y recomendación
-│   ├── web.py               # servidor HTTP local y API
-│   ├── static/              # interfaz web
-│   └── consts.py            # rutas y constantes
-├── tests/                   # pruebas unitarias
-├── pyproject.toml           # metadatos, dependencias y comandos
-└── uv.lock                  # versiones bloqueadas
+│   ├── etl.py               # Data preparation, TF-IDF, clustering, and recommendations
+│   ├── web.py               # Local HTTP server and application logic
+│   ├── static/
+│   │   ├── index.html       # Web interface
+│   │   ├── app.js           # Frontend behavior
+│   │   └── styles.css       # Interface styling
+│   └── consts.py            # Paths and constants
+├── tests/
+│   ├── test_etl.py          # ETL and recommendation tests
+│   └── test_web.py          # Web application logic tests
+├── pyproject.toml           # Project metadata, dependencies, and commands
+└── uv.lock                  # Locked dependency versions
 ```
 
-## Publicar en GitHub
+## Publishing to GitHub
 
-Antes de crear un commit, revisa que los cambios y archivos generados sean los
-esperados:
+Before creating a commit, review the changes and check for whitespace errors:
 
 ```bash
 git status --short
@@ -252,30 +248,26 @@ git diff --check
 git diff --stat
 ```
 
-Ejecuta las [pruebas y comprobaciones](#pruebas-y-comprobaciones). Después, añade los
-archivos que quieres compartir, crea el commit y sube tu rama:
+Run the tests and quality checks described above.
+
+Stage the files you intend to publish, create a commit, and push your branch. For example, if you are working on `main`:
 
 ```bash
-git add README.md pyproject.toml uv.lock src tests notebooks
-git commit -m "feat: prioriza términos TF-IDF por descripción"
-git push -u origin <nombre-de-tu-rama>
+git add README.md docs/images/movie-explorer.png
+git commit -m "docs: improve project README and add application screenshot"
+git push origin main
 ```
 
-Abre un Pull Request en GitHub si el repositorio trabaja mediante revisión. Comprueba
-que en la página del repositorio se vean el README, el notebook y la estructura
-esperada. No subas `.venv`, `dist`, cachés, credenciales ni datos privados.
+If you are working on a separate branch, replace `main` with your branch name. Open a pull request if you use a review-based workflow.
 
-Antes de hacer público el repositorio, revisa también la sección sobre
-[licencia y datos](#licencia-y-uso-de-los-datos). Este repositorio no configura
-actualmente un workflow de CI; los comandos anteriores son comprobaciones locales.
+After pushing, visit the repository page and check that the README, screenshot, notebook, and project structure render correctly.
 
-## Licencia y uso de los datos
+Do not commit virtual environments, generated build artifacts, cache directories, credentials, or private data.
 
-El proyecto no declara todavía una licencia de software. Antes de permitir que otras
-personas reutilicen o distribuyan el código, el propietario debe elegir una licencia
-apropiada y añadir su archivo (por ejemplo, `LICENSE`).
+## License and Dataset Usage
 
-El CSV está incluido en `data/netflix_titles.csv`. Confirma y documenta la procedencia
-del dataset y que sus condiciones permiten redistribuirlo públicamente antes de
-publicar el repositorio abierto. La licencia que se elija para el código no concede
-automáticamente derechos sobre el dataset.
+The repository does not currently declare a software license. Before allowing others to reuse or redistribute the code, choose an appropriate license and add a corresponding `LICENSE` file.
+
+The dataset is included in `data/netflix_titles.csv`. Before distributing the repository publicly, verify and document the dataset's origin and whether its terms permit redistribution.
+
+A license applied to the project code does not automatically grant rights to redistribute the dataset.
